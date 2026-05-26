@@ -10,9 +10,10 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
     confusion_matrix,
-    classification_report
+    classification_report,
 )
 import matplotlib.pyplot as plt
+
 
 class CNNModel(nn.Module):
 
@@ -20,28 +21,24 @@ class CNNModel(nn.Module):
         super(CNNModel, self).__init__()
 
         self.features = nn.Sequential(
-
             # BLOCK 1
             nn.Conv2d(1, 32, kernel_size=3, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Dropout(0.10),
-
             # BLOCK 2
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Dropout(0.20),
-
             # BLOCK 3
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Dropout(0.25),
-
             # BLOCK 4
             nn.Conv2d(128, 256, kernel_size=3, padding=1),
             nn.BatchNorm2d(256),
@@ -58,7 +55,7 @@ class CNNModel(nn.Module):
             nn.Linear(512, 256),
             nn.ReLU(),
             nn.Dropout(0.30),
-            nn.Linear(256, num_classes)
+            nn.Linear(256, num_classes),
         )
 
     def forward(self, x):
@@ -67,11 +64,9 @@ class CNNModel(nn.Module):
         return x
 
 
-
-
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
 # 1. Data
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
 
 def prepare_tensors(*arrays, dtype=torch.float32):
     """Convert numpy arrays to float tensors and permute to (N, C, H, W)."""
@@ -90,8 +85,9 @@ def make_loaders(train_x, train_y, val_x, val_y, test_x, test_y,
                  batch_size=32):
     """Wrap tensor pairs in DataLoaders."""
     def _loader(x, y, shuffle):
-        return DataLoader(TensorDataset(x, y), batch_size=batch_size,
-                          shuffle=shuffle)
+        return DataLoader(
+            TensorDataset(x, y), batch_size=batch_size, shuffle=shuffle
+        )
 
     return (
         _loader(train_x, train_y, shuffle=True),
@@ -102,7 +98,15 @@ def make_loaders(train_x, train_y, val_x, val_y, test_x, test_y,
 
 def data_preparation(train_x, train_y, val_x, val_y, test_x, test_y,
                      batch_size=32):
-    """Full data-prep pipeline; returns (loaders, num_classes, device)."""
+    """
+    Full data-prep pipeline.
+
+    Returns (loaders, device).
+
+    NOTE: num_classes is intentionally NOT derived here from the training
+    labels, because not every class is guaranteed to appear in the training
+    split.  Pass num_classes explicitly from run_pipeline using len(labels).
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
@@ -110,18 +114,20 @@ def data_preparation(train_x, train_y, val_x, val_y, test_x, test_y,
     ys = prepare_labels(train_y, val_y, test_y)
 
     print(f"train_x shape: {xs[0].shape}")
-    assert xs[0].shape[1] == 1, f"Expected 1 channel, got {xs[0].shape[1]}"
+    assert xs[0].shape[1] == 1, (
+        f"Expected 1 channel, got {xs[0].shape[1]}. "
+        "Ensure feature arrays have shape (N, H, W, 1)."
+    )
 
-    loaders = make_loaders(xs[0], ys[0], xs[1], ys[1], xs[2], ys[2], batch_size=batch_size)
-    num_classes = len(torch.unique(ys[0]))
-    print(f"Number of classes: {num_classes}")
+    loaders = make_loaders(
+        xs[0], ys[0], xs[1], ys[1], xs[2], ys[2], batch_size=batch_size
+    )
+    return loaders, device
 
-    return loaders, num_classes, device
 
-
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
 # 2. Training helpers
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
 
 def run_epoch(model, loader, criterion, device, optimizer=None):
     """
@@ -167,7 +173,7 @@ def check_early_stopping(val_loss, best_val_loss, counter, patience,
     if val_loss < best_val_loss:
         best_val_loss = val_loss
         torch.save(model.state_dict(), save_path)
-        print("  ✓ Best model saved")
+        print("  Best model saved")
         counter = 0
     else:
         counter += 1
@@ -176,9 +182,9 @@ def check_early_stopping(val_loss, best_val_loss, counter, patience,
     return best_val_loss, counter, stop
 
 
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
 # 3. Training loop
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
 
 def train(model, train_loader, val_loader, criterion, optimizer, scheduler,
           device, epochs, patience, save_path="best_model.pth"):
@@ -202,8 +208,8 @@ def train(model, train_loader, val_loader, criterion, optimizer, scheduler,
         history["val_acc"].append(val_acc)
 
         print(f"\nEpoch [{epoch+1}/{epochs}]")
-        print(f"  Train — Loss: {train_loss:.4f}  Acc: {train_acc:.4f}")
-        print(f"  Val   — Loss: {val_loss:.4f}  Acc: {val_acc:.4f}")
+        print(f"  Train | Loss: {train_loss:.4f}  Acc: {train_acc:.4f}")
+        print(f"  Val   | Loss: {val_loss:.4f}  Acc: {val_acc:.4f}")
 
         best_val_loss, counter, stop = check_early_stopping(
             val_loss, best_val_loss, counter, patience, model, save_path
@@ -215,19 +221,18 @@ def train(model, train_loader, val_loader, criterion, optimizer, scheduler,
     return history
 
 
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
 # 4. Evaluation
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
 
 def evaluate(model, test_loader, criterion, device,
              save_path="best_model.pth"):
     """Load best weights, run test set, print metrics. Returns (preds, targets)."""
-    model.load_state_dict(torch.load(save_path))
+    model.load_state_dict(torch.load(save_path, map_location=device))
     test_loss, test_acc = run_epoch(
         model, test_loader, criterion, device, optimizer=None
     )
 
-    # Collect preds for detailed metrics
     preds_all, targets_all = [], []
     model.eval()
     with torch.no_grad():
@@ -236,9 +241,13 @@ def evaluate(model, test_loader, criterion, device,
             preds_all.extend(torch.argmax(outputs, dim=1).cpu().numpy())
             targets_all.extend(targets.numpy())
 
-    precision = precision_score(targets_all, preds_all, average="weighted", zero_division=0)
-    recall    = recall_score(targets_all, preds_all, average="weighted", zero_division=0)
-    f1        = f1_score(targets_all, preds_all, average="weighted", zero_division=0)
+    precision = precision_score(
+        targets_all, preds_all, average="weighted", zero_division=0
+    )
+    recall = recall_score(
+        targets_all, preds_all, average="weighted", zero_division=0
+    )
+    f1 = f1_score(targets_all, preds_all, average="weighted", zero_division=0)
 
     print("\n" + "=" * 40)
     print(f"Test Accuracy : {test_acc:.4f}")
@@ -253,9 +262,9 @@ def evaluate(model, test_loader, criterion, device,
     return preds_all, targets_all
 
 
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
 # 5. Visualisation
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
 
 def plot_history(history, save_path="training_history.png"):
     """Plot loss and accuracy curves side-by-side."""
@@ -268,8 +277,10 @@ def plot_history(history, save_path="training_history.png"):
         ["Loss per Epoch", "Accuracy per Epoch"],
         ["Loss", "Accuracy"],
     ):
-        ax.plot(epochs_ran, history[metric[0]], label=f"Train {ylabel}", color="royalblue")
-        ax.plot(epochs_ran, history[metric[1]], label=f"Val {ylabel}",   color="tomato")
+        ax.plot(epochs_ran, history[metric[0]], label=f"Train {ylabel}",
+                color="royalblue")
+        ax.plot(epochs_ran, history[metric[1]], label=f"Val {ylabel}",
+                color="tomato")
         ax.set_title(title)
         ax.set_xlabel("Epoch")
         ax.set_ylabel(ylabel)
@@ -279,11 +290,8 @@ def plot_history(history, save_path="training_history.png"):
     plt.suptitle("Training History", fontsize=14, fontweight="bold")
     plt.tight_layout()
     folder = Path("images")
-    folder.mkdir(
-        parents=True,
-        exist_ok=True
-    )
-    plt.savefig(folder/save_path, dpi=150)
+    folder.mkdir(parents=True, exist_ok=True)
+    plt.savefig(folder / save_path, dpi=150)
     plt.show()
 
 
@@ -292,29 +300,27 @@ def plot_confusion_matrix(targets, preds, labels,
     """Plot and save a labelled confusion-matrix heatmap."""
     cm = confusion_matrix(targets, preds)
     plt.figure(figsize=(18, 16))
-    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
-                xticklabels=labels, yticklabels=labels)
+    sns.heatmap(
+        cm, annot=True, fmt="d", cmap="Blues",
+        xticklabels=labels, yticklabels=labels,
+    )
     plt.title("Confusion Matrix", fontsize=14, fontweight="bold")
     plt.xlabel("Predicted Label")
     plt.ylabel("True Label")
     plt.tight_layout()
-
     folder = Path("images")
-    folder.mkdir(
-        parents=True,
-        exist_ok=True
-    )
-    plt.savefig(folder/save_path, dpi=150)
+    folder.mkdir(parents=True, exist_ok=True)
+    plt.savefig(folder / save_path, dpi=150)
     plt.show()
 
 
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
 # 6. Orchestrator
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
 
 def build_training_components(num_classes, device):
     """Instantiate model, criterion, optimizer, and scheduler."""
-    model     = CNNModel(num_classes).to(device)
+    model = CNNModel(num_classes).to(device)
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
     optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
@@ -324,12 +330,27 @@ def build_training_components(num_classes, device):
     return model, criterion, optimizer, scheduler
 
 
-def run_pipeline(train_x, train_y, val_x, val_y, test_x, test_y,
-                 labels, epochs=50, patience=10, batch_size=32, scenario="mel"):
-    """End-to-end pipeline: prep → train → evaluate → visualise."""
+def run_pipeline(
+    train_x, train_y,
+    val_x,   val_y,
+    test_x,  test_y,
+    labels,
+    epochs=50,
+    patience=10,
+    batch_size=32,
+    scenario="mel",
+):
+    """End-to-end pipeline: prep -> train -> evaluate -> visualise."""
     torch.manual_seed(42)
+
+    # num_classes comes from the full label list, not from unique training values.
+    # This ensures the model always has 48 output neurons regardless of which
+    # classes happen to appear in the training split.
+    num_classes = len(labels)
+    print(f"Number of classes: {num_classes}")
+
     # Data
-    (train_loader, val_loader, test_loader), num_classes, device = data_preparation(
+    (train_loader, val_loader, test_loader), device = data_preparation(
         train_x, train_y, val_x, val_y, test_x, test_y, batch_size
     )
 
@@ -339,15 +360,20 @@ def run_pipeline(train_x, train_y, val_x, val_y, test_x, test_y,
     )
 
     # Train
+    save_path = f"best_{scenario}_model.pth"
     history = train(
         model, train_loader, val_loader, criterion, optimizer, scheduler,
-        device, epochs=epochs, patience=patience, save_path=(f"best_{scenario}_model.pth")
+        device, epochs=epochs, patience=patience, save_path=save_path,
     )
 
     # Evaluate
-    preds, targets = evaluate(model, test_loader, criterion, device, save_path=f"best_{scenario}_model.pth")
+    preds, targets = evaluate(
+        model, test_loader, criterion, device, save_path=save_path
+    )
 
     # Visualise
-    plot_history(history, save_path=(f"{scenario}_training_history.png"))
-    plot_confusion_matrix(targets, preds, labels, save_path=(f"{scenario}_confusion_matrix.png"))
-
+    plot_history(history, save_path=f"{scenario}_training_history.png")
+    plot_confusion_matrix(
+        targets, preds, labels,
+        save_path=f"{scenario}_confusion_matrix.png",
+    )

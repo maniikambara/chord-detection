@@ -1,0 +1,8 @@
+streamlit>=1.34
+torch
+numpy
+scikit-learn
+matplotlib
+seaborn
+librosa
+soundfile

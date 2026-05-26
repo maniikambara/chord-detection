@@ -1,0 +1,7 @@
+/.venv
+/__pycache__/
+*.pyc
+/audio_augmented_x10
+/chroma_cache
+/mel_cache
+/mfcc_cache
