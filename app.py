@@ -30,7 +30,14 @@ except ImportError:
 HAS_AUDIO_INPUT = hasattr(st, "audio_input")
 
 from cnn import CNNModel
-from load import LABELS, CHORD_TYPE_NAMES
+from load import LABELS
+
+CHORD_TYPE_NAMES = {
+    "a": "Augmented",
+    "d": "Diminished",
+    "j": "Major",
+    "n": "Minor",
+}
 
 FEATURE_CONFIG = {
     "mel": {
