@@ -21,23 +21,23 @@ class CNNModel(nn.Module):
 
         self.features = nn.Sequential(
 
-            # BLOCK 1
+            # BLOK 1
             nn.Conv2d(1, 32, kernel_size=3, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(),
 
-            # BLOCK 2
+            # BLOK 2
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
 
-            # BLOCK 3
+            # BLOK 3
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(),
 
-            # BLOCK 4
+            # BLOK 4
             nn.Conv2d(128, 256, kernel_size=3, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(),
@@ -68,7 +68,7 @@ class CNNModel(nn.Module):
 # ─────────────────────────────────────────
 
 def prepare_tensors(*arrays, dtype=torch.float32):
-    """Convert numpy arrays to float tensors and permute to (N, C, H, W)."""
+    """Mengonversi numpy array ke float tensor dan mengubah urutan dimensi ke (N, C, H, W)."""
     return [
         torch.tensor(a, dtype=dtype).permute(0, 3, 1, 2)
         for a in arrays
@@ -76,13 +76,13 @@ def prepare_tensors(*arrays, dtype=torch.float32):
 
 
 def prepare_labels(*arrays):
-    """Convert numpy label arrays to long tensors."""
+    """Mengonversi numpy array label ke long tensor."""
     return [torch.tensor(a, dtype=torch.long) for a in arrays]
 
 
 def make_loaders(train_x, train_y, val_x, val_y, test_x, test_y,
                  batch_size=32):
-    """Wrap tensor pairs in DataLoaders."""
+    """Membungkus pasangan tensor ke dalam DataLoaders."""
     def _loader(x, y, shuffle):
         return DataLoader(TensorDataset(x, y), batch_size=batch_size,
                           shuffle=shuffle)
@@ -96,32 +96,32 @@ def make_loaders(train_x, train_y, val_x, val_y, test_x, test_y,
 
 def data_preparation(train_x, train_y, val_x, val_y, test_x, test_y,
                      batch_size=32):
-    """Full data-prep pipeline; returns (loaders, num_classes, device)."""
+    """Alur lengkap penyiapan data; mengembalikan (loaders, num_classes, device)."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    print(f"Menggunakan perangkat: {device}")
 
     xs = prepare_tensors(train_x, val_x, test_x)
     ys = prepare_labels(train_y, val_y, test_y)
 
-    print(f"train_x shape: {xs[0].shape}")
-    assert xs[0].shape[1] == 1, f"Expected 1 channel, got {xs[0].shape[1]}"
+    print(f"Ukuran train_x: {xs[0].shape}")
+    assert xs[0].shape[1] == 1, f"Diharapkan 1 kanal (channel), mendapatkan {xs[0].shape[1]}"
 
     loaders = make_loaders(xs[0], ys[0], xs[1], ys[1], xs[2], ys[2], batch_size=batch_size)
     num_classes = len(torch.unique(ys[0]))
-    print(f"Number of classes: {num_classes}")
+    print(f"Jumlah kelas: {num_classes}")
 
     return loaders, num_classes, device
 
 
 # ─────────────────────────────────────────
-# 2. Training helpers
+# 2. Pembantu Pelatihan (Training Helpers)
 # ─────────────────────────────────────────
 
 def run_epoch(model, loader, criterion, device, optimizer=None):
     """
-    Run one epoch (train or eval).
-    Pass optimizer=None for eval mode (no gradient update).
-    Returns (avg_loss, accuracy).
+    Menjalankan satu epoch (pelatihan atau evaluasi).
+    Gunakan optimizer=None untuk mode evaluasi (tanpa pembaruan gradien).
+    Mengembalikan (avg_loss, accuracy).
     """
     is_train = optimizer is not None
     model.train() if is_train else model.eval()
@@ -155,13 +155,13 @@ def run_epoch(model, loader, criterion, device, optimizer=None):
 def check_early_stopping(val_loss, best_val_loss, counter, patience,
                          model, save_path="best_model.pth"):
     """
-    Save model on improvement; increment counter otherwise.
-    Returns (best_val_loss, counter, stop).
+    Menyimpan model ketika ada peningkatan; meningkatkan penghitung (counter) jika tidak.
+    Mengembalikan (best_val_loss, counter, stop).
     """
     if val_loss < best_val_loss:
         best_val_loss = val_loss
         torch.save(model.state_dict(), save_path)
-        print("  ✓ Best model saved")
+        print("  ✓ Model terbaik disimpan")
         counter = 0
     else:
         counter += 1
@@ -171,12 +171,12 @@ def check_early_stopping(val_loss, best_val_loss, counter, patience,
 
 
 # ─────────────────────────────────────────
-# 3. Training loop
+# 3. Loop Pelatihan (Training Loop)
 # ─────────────────────────────────────────
 
 def train(model, train_loader, val_loader, criterion, optimizer, scheduler,
           device, epochs, patience, save_path="best_model.pth"):
-    """Full training loop with early stopping. Returns history dict."""
+    """Loop pelatihan lengkap dengan penghentian awal (early stopping). Mengembalikan kamus riwayat (history dict)."""
     history = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
     best_val_loss, counter = float("inf"), 0
 
@@ -196,32 +196,32 @@ def train(model, train_loader, val_loader, criterion, optimizer, scheduler,
         history["val_acc"].append(val_acc)
 
         print(f"\nEpoch [{epoch+1}/{epochs}]")
-        print(f"  Train — Loss: {train_loss:.4f}  Acc: {train_acc:.4f}")
-        print(f"  Val   — Loss: {val_loss:.4f}  Acc: {val_acc:.4f}")
+        print(f"  Latih — Loss: {train_loss:.4f}  Akurasi: {train_acc:.4f}")
+        print(f"  Val   — Loss: {val_loss:.4f}  Akurasi: {val_acc:.4f}")
 
         best_val_loss, counter, stop = check_early_stopping(
             val_loss, best_val_loss, counter, patience, model, save_path
         )
         if stop:
-            print("\nEarly stopping triggered!")
+            print("\nPenghentian awal (early stopping) terpicu!")
             break
 
     return history
 
 
 # ─────────────────────────────────────────
-# 4. Evaluation
+# 4. Evaluasi (Evaluation)
 # ─────────────────────────────────────────
 
 def evaluate(model, test_loader, criterion, labels, device,
              save_path="best_model.pth"):
-    """Load best weights, run test set, print metrics. Returns (preds, targets)."""
+    """Memuat bobot terbaik, menjalankan set pengujian, dan menampilkan metrik. Mengembalikan (preds, targets)."""
     model.load_state_dict(torch.load(save_path, weights_only=True))
     test_loss, test_acc = run_epoch(
         model, test_loader, criterion, device, optimizer=None
     )
 
-    # Collect preds for detailed metrics
+    # Mengumpulkan prediksi untuk metrik mendetail
     preds_all, targets_all = [], []
     model.eval()
     with torch.no_grad():
@@ -235,34 +235,34 @@ def evaluate(model, test_loader, criterion, labels, device,
     f1        = f1_score(targets_all, preds_all, average="weighted", zero_division=0)
 
     print("\n" + "=" * 40)
-    print(f"Test Accuracy : {test_acc:.4f}")
-    print(f"Test Loss     : {test_loss:.4f}")
-    print(f"Precision     : {precision:.4f}")
-    print(f"Recall        : {recall:.4f}")
-    print(f"F1 Score      : {f1:.4f}")
+    print(f"Akurasi Pengujian : {test_acc:.4f}")
+    print(f"Loss Pengujian     : {test_loss:.4f}")
+    print(f"Presisi           : {precision:.4f}")
+    print(f"Sensitivitas (Recall) : {recall:.4f}")
+    print(f"Skor F1            : {f1:.4f}")
     print("=" * 40)
-    print("\nClassification Report:")
+    print("\nLaporan Klasifikasi:")
     print(classification_report(targets_all, preds_all, target_names=labels, zero_division=0))
 
     return preds_all, targets_all
 
 
 # ─────────────────────────────────────────
-# 5. Visualisation
+# 5. Visualisasi (Visualisation)
 # ─────────────────────────────────────────
 
 def plot_history(history, save_path="training_history.png"):
-    """Plot loss and accuracy curves side-by-side."""
+    """Menggambar kurva loss dan akurasi secara berdampingan."""
     epochs_ran = range(1, len(history["train_loss"]) + 1)
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
     for ax, metric, title, ylabel in zip(
         axes,
         [("train_loss", "val_loss"), ("train_acc", "val_acc")],
-        ["Loss per Epoch", "Accuracy per Epoch"],
-        ["Loss", "Accuracy"],
+        ["Loss per Epoch", "Akurasi per Epoch"],
+        ["Loss", "Akurasi"],
     ):
-        ax.plot(epochs_ran, history[metric[0]], label=f"Train {ylabel}", color="royalblue")
+        ax.plot(epochs_ran, history[metric[0]], label=f"Latih {ylabel}", color="royalblue")
         ax.plot(epochs_ran, history[metric[1]], label=f"Val {ylabel}",   color="tomato")
         ax.set_title(title)
         ax.set_xlabel("Epoch")
@@ -270,7 +270,7 @@ def plot_history(history, save_path="training_history.png"):
         ax.legend()
         ax.grid(True)
 
-    plt.suptitle("Training History", fontsize=14, fontweight="bold")
+    plt.suptitle("Riwayat Pelatihan", fontsize=14, fontweight="bold")
     plt.tight_layout()
     folder = Path("images")
     folder.mkdir(
@@ -288,9 +288,9 @@ def plot_confusion_matrix(targets, preds, labels,
     sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
                 xticklabels=labels, yticklabels=labels,
                 annot_kws={"size": 8})
-    plt.title("Confusion Matrix", fontsize=16, fontweight="bold")
-    plt.xlabel("Predicted Label", fontsize=12)
-    plt.ylabel("True Label", fontsize=12)
+    plt.title("Matriks Kebingungan (Confusion Matrix)", fontsize=16, fontweight="bold")
+    plt.xlabel("Label Prediksi", fontsize=12)
+    plt.ylabel("Label Sebenarnya", fontsize=12)
 
     ax = plt.gca()
     plt.setp(ax.get_xticklabels(), rotation=90, ha="center", fontsize=10)
@@ -304,11 +304,11 @@ def plot_confusion_matrix(targets, preds, labels,
 
 
 # ─────────────────────────────────────────
-# 6. Orchestrator
+# 6. Orkestrator (Orchestrator)
 # ─────────────────────────────────────────
 
 def build_training_components(num_classes, device):
-    """Instantiate model, criterion, optimizer, and scheduler."""
+    """Menginstansiasi model, kriteria loss, optimizer, dan scheduler."""
     model     = CNNModel(num_classes).to(device)
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
     optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
@@ -321,28 +321,28 @@ def build_training_components(num_classes, device):
 
 def run_pipeline(train_x, train_y, val_x, val_y, test_x, test_y,
                  labels, epochs=50, patience=10, batch_size=32, scenario="mel"):
-    """End-to-end pipeline: prep → train → evaluate → visualise."""
+    """Alur lengkap (end-to-end pipeline): penyiapan → pelatihan → evaluasi → visualisasi."""
     torch.manual_seed(42)
-    # Data
+    # Penyiapan Data
     (train_loader, val_loader, test_loader), num_classes, device = data_preparation(
         train_x, train_y, val_x, val_y, test_x, test_y, batch_size
     )
 
-    # Components
+    # Komponen
     model, criterion, optimizer, scheduler = build_training_components(
         num_classes, device
     )
 
-    # Train
+    # Pelatihan
     history = train(
         model, train_loader, val_loader, criterion, optimizer, scheduler,
         device, epochs=epochs, patience=patience, save_path=(f"best_{scenario}_model.pth")
     )
 
-    # Evaluate
+    # Evaluasi
     preds, targets = evaluate(model, test_loader, criterion, labels, device, save_path=f"best_{scenario}_model.pth")
 
-    # Visualise
+    # Visualisasi
     plot_history(history, save_path=(f"{scenario}_training_history.png"))
     plot_confusion_matrix(targets, preds, labels, save_path=(f"{scenario}_confusion_matrix.png"))
 

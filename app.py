@@ -35,7 +35,7 @@ from load import LABELS
 CHORD_TYPE_NAMES = {
     "a": "Augmented",
     "d": "Diminished",
-    "j": "Major",
+    "j": "Mayor",
     "n": "Minor",
 }
 
@@ -65,7 +65,7 @@ N_MELS     = 128
 N_MFCC     = 13
 
 
-# -- Audio / feature utilities -------------------------------------------------
+# -- Utilitas audio / fitur -------------------------------------------------
 
 def normalize_audio(audio: np.ndarray) -> np.ndarray:
     audio = audio.astype(np.float32)
@@ -164,8 +164,8 @@ def render_feature_map(feature: np.ndarray, feature_key: str) -> None:
         cbar = plt.colorbar(im, ax=ax, pad=0.015, fraction=0.025)
         cbar.ax.tick_params(colors="#6b7db3", labelsize=7)
         cbar.outline.set_edgecolor("#232b4a")
-        ax.set_xlabel("Time frames", color="#6b7db3", fontsize=8, labelpad=6)
-        ax.set_ylabel("Freq bins",   color="#6b7db3", fontsize=8, labelpad=6)
+        ax.set_xlabel("Frame waktu (time frames)", color="#6b7db3", fontsize=8, labelpad=6)
+        ax.set_ylabel("Bin frekuensi (freq bins)",   color="#6b7db3", fontsize=8, labelpad=6)
         ax.tick_params(colors="#6b7db3", labelsize=7)
         for spine in ax.spines.values():
             spine.set_edgecolor("#232b4a")
@@ -178,18 +178,18 @@ def render_feature_map(feature: np.ndarray, feature_key: str) -> None:
         st.image(img_norm, use_container_width=True)
 
 
-# -- Page config ---------------------------------------------------------------
+# -- Konfigurasi halaman ---------------------------------------------------------------
 st.set_page_config(
     page_title="ChordNet",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-# -- Session state -------------------------------------------------------------
+# -- Status sesi (session state) -------------------------------------------------------------
 if "result" not in st.session_state:
     st.session_state.result = None
 
-# -- Global CSS ----------------------------------------------------------------
+# -- CSS Global ----------------------------------------------------------------
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
@@ -235,7 +235,7 @@ html, body, [class*="css"] {
     max-width: 100% !important;
 }
 
-/* Grid overlay */
+/* Kisi latar belakang (grid overlay) */
 .stApp::before {
     content: '';
     position: fixed;
@@ -248,7 +248,7 @@ html, body, [class*="css"] {
     z-index: 0;
 }
 
-/* Page header */
+/* Header halaman */
 .page-header {
     padding: 3rem 2.5rem 2.5rem;
     border-bottom: 1px solid var(--border);
@@ -303,7 +303,7 @@ html, body, [class*="css"] {
     margin: 0;
 }
 
-/* Column layout */
+/* Tata letak kolom */
 [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child {
     border-right: 1px solid var(--border);
     position: sticky;
@@ -317,7 +317,7 @@ html, body, [class*="css"] {
     padding: 1.75rem 2.5rem !important;
 }
 
-/* Field label */
+/* Label kolom input (field label) */
 .field-label {
     font-size: 0.67rem;
     font-weight: 700;
@@ -327,14 +327,14 @@ html, body, [class*="css"] {
     margin-bottom: 0.6rem;
 }
 
-/* Horizontal divider */
+/* Pembagi horizontal */
 .hdivider {
     height: 1px;
     background: var(--border);
     margin: 1.1rem 0;
 }
 
-/* File uploader */
+/* Pengunggah berkas */
 [data-testid="stFileUploader"] > div:first-child {
     background: var(--surface) !important;
     border: 1.5px dashed var(--border-light) !important;
@@ -356,7 +356,7 @@ html, body, [class*="css"] {
     font-size: 0.8rem !important;
 }
 
-/* Audio player */
+/* Pemutar audio */
 audio {
     width: 100%;
     height: 36px;
@@ -365,7 +365,7 @@ audio {
     accent-color: var(--accent-mid);
 }
 
-/* Radio buttons */
+/* Tombol pilihan (radio buttons) */
 [data-testid="stRadio"] > div {
     gap: 0.45rem !important;
     flex-direction: column !important;
@@ -401,7 +401,7 @@ audio {
     margin: 0;
 }
 
-/* Description box */
+/* Kotak deskripsi */
 .desc-box {
     font-size: 0.78rem;
     color: var(--text-muted);
@@ -413,7 +413,7 @@ audio {
     margin-top: 0.5rem;
 }
 
-/* Detect button */
+/* Tombol deteksi */
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, var(--accent) 0%, var(--accent-mid) 50%, #7779fa 100%) !important;
     color: #fff !important;
@@ -440,7 +440,7 @@ audio {
     box-shadow: 0 2px 12px rgba(91,94,244,0.35) !important;
 }
 
-/* Empty state */
+/* Halaman kosong (empty state) */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -510,7 +510,7 @@ audio {
     padding-top: 1px;
 }
 
-/* Chord result card */
+/* Kartu tampilan chord */
 .chord-display {
     background: linear-gradient(145deg, var(--surface) 0%, var(--surface-alt) 100%);
     border: 1px solid var(--border-light);
@@ -623,7 +623,7 @@ audio {
     text-align: right;
 }
 
-/* Top-5 list */
+/* Daftar 5 prediksi teratas */
 .section-label {
     font-size: 0.67rem;
     font-weight: 700;
@@ -704,7 +704,7 @@ audio {
 
 .pred-row.top .pred-pct { color: var(--accent-light); }
 
-/* Feature map section */
+/* Bagian peta fitur */
 .feat-header {
     font-size: 0.67rem;
     font-weight: 700;
@@ -714,7 +714,7 @@ audio {
     margin: 1.1rem 0 0.55rem;
 }
 
-/* Expander */
+/* Ekspander */
 [data-testid="stExpander"] {
     background: var(--surface) !important;
     border: 1px solid var(--border) !important;
@@ -735,7 +735,7 @@ audio {
     background: var(--surface-hi) !important;
 }
 
-/* Alerts */
+/* Peringatan (alerts) */
 [data-testid="stAlert"] {
     border-radius: var(--r-md) !important;
     border-left-width: 3px !important;
@@ -744,14 +744,14 @@ audio {
     background: var(--surface) !important;
 }
 
-/* Spinner */
+/* Indikator putar (spinner) */
 [data-testid="stSpinner"] p {
     color: var(--text-muted) !important;
     font-family: var(--sans) !important;
     font-size: 0.84rem !important;
 }
 
-/* Caption */
+/* Keterangan gambar (caption) */
 [data-testid="stCaptionContainer"] p {
     font-size: 0.71rem !important;
     color: var(--text-muted) !important;
@@ -796,13 +796,13 @@ audio {
     letter-spacing: 0.03em;
 }
 
-/* Scrollbar */
+/* Bilah gulir (scrollbar) */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(91,94,244,0.45); }
 
-/* Responsive */
+/* Responsif */
 @media (max-width: 920px) {
     .page-header { padding: 2.5rem 1.5rem 2rem; }
     [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child {
@@ -836,7 +836,7 @@ audio {
 </style>
 """, unsafe_allow_html=True)
 
-# -- Page header ---------------------------------------------------------------
+# -- Header halaman ---------------------------------------------------------------
 st.markdown("""
 <div class="page-header">
     <h1 class="page-title">Chord<span class="grad">Net</span></h1>
@@ -847,10 +847,10 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# -- Two-column layout ---------------------------------------------------------
+# -- Tata letak dua kolom ---------------------------------------------------------
 col_left, col_right = st.columns([1, 1.9], gap="small")
 
-# -- LEFT: input controls ------------------------------------------------------
+# -- KIRI: kontrol input ------------------------------------------------------
 with col_left:
     st.markdown('<div class="field-label">Sumber Audio</div>', unsafe_allow_html=True)
     input_mode = st.radio(
@@ -917,10 +917,10 @@ with col_left:
         use_container_width=True,
     )
 
-# -- RIGHT: results or empty state ---------------------------------------------
+# -- KANAN: hasil atau halaman kosong ---------------------------------------------
 with col_right:
     if run_button:
-        # Resolve active input source
+        # Tentukan sumber input aktif
         if input_mode == "upload":
             active_audio = uploaded_audio
             file_suffix  = (
