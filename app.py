@@ -30,14 +30,7 @@ except ImportError:
 HAS_AUDIO_INPUT = hasattr(st, "audio_input")
 
 from cnn import CNNModel
-from load import LABELS
-
-CHORD_TYPE_NAMES = {
-    "a": "Augmented",
-    "d": "Diminished",
-    "j": "Mayor",
-    "n": "Minor",
-}
+from load import LABELS, CHORD_TYPE_NAMES
 
 FEATURE_CONFIG = {
     "mel": {
@@ -65,7 +58,7 @@ N_MELS     = 128
 N_MFCC     = 13
 
 
-# -- Utilitas audio / fitur -------------------------------------------------
+# -- Audio / feature utilities -------------------------------------------------
 
 def normalize_audio(audio: np.ndarray) -> np.ndarray:
     audio = audio.astype(np.float32)
@@ -164,8 +157,8 @@ def render_feature_map(feature: np.ndarray, feature_key: str) -> None:
         cbar = plt.colorbar(im, ax=ax, pad=0.015, fraction=0.025)
         cbar.ax.tick_params(colors="#6b7db3", labelsize=7)
         cbar.outline.set_edgecolor("#232b4a")
-        ax.set_xlabel("Frame waktu (time frames)", color="#6b7db3", fontsize=8, labelpad=6)
-        ax.set_ylabel("Bin frekuensi (freq bins)",   color="#6b7db3", fontsize=8, labelpad=6)
+        ax.set_xlabel("Time frames", color="#6b7db3", fontsize=8, labelpad=6)
+        ax.set_ylabel("Freq bins",   color="#6b7db3", fontsize=8, labelpad=6)
         ax.tick_params(colors="#6b7db3", labelsize=7)
         for spine in ax.spines.values():
             spine.set_edgecolor("#232b4a")
@@ -178,18 +171,18 @@ def render_feature_map(feature: np.ndarray, feature_key: str) -> None:
         st.image(img_norm, use_container_width=True)
 
 
-# -- Konfigurasi halaman ---------------------------------------------------------------
+# -- Page config ---------------------------------------------------------------
 st.set_page_config(
     page_title="ChordNet",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-# -- Status sesi (session state) -------------------------------------------------------------
+# -- Session state -------------------------------------------------------------
 if "result" not in st.session_state:
     st.session_state.result = None
 
-# -- CSS Global ----------------------------------------------------------------
+# -- Global CSS ----------------------------------------------------------------
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
@@ -235,7 +228,7 @@ html, body, [class*="css"] {
     max-width: 100% !important;
 }
 
-/* Kisi latar belakang (grid overlay) */
+/* Grid overlay */
 .stApp::before {
     content: '';
     position: fixed;
@@ -248,7 +241,7 @@ html, body, [class*="css"] {
     z-index: 0;
 }
 
-/* Header halaman */
+/* Page header */
 .page-header {
     padding: 3rem 2.5rem 2.5rem;
     border-bottom: 1px solid var(--border);
@@ -303,7 +296,7 @@ html, body, [class*="css"] {
     margin: 0;
 }
 
-/* Tata letak kolom */
+/* Column layout */
 [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child {
     border-right: 1px solid var(--border);
     position: sticky;
@@ -317,7 +310,7 @@ html, body, [class*="css"] {
     padding: 1.75rem 2.5rem !important;
 }
 
-/* Label kolom input (field label) */
+/* Field label */
 .field-label {
     font-size: 0.67rem;
     font-weight: 700;
@@ -327,14 +320,14 @@ html, body, [class*="css"] {
     margin-bottom: 0.6rem;
 }
 
-/* Pembagi horizontal */
+/* Horizontal divider */
 .hdivider {
     height: 1px;
     background: var(--border);
     margin: 1.1rem 0;
 }
 
-/* Pengunggah berkas */
+/* File uploader */
 [data-testid="stFileUploader"] > div:first-child {
     background: var(--surface) !important;
     border: 1.5px dashed var(--border-light) !important;
@@ -356,7 +349,7 @@ html, body, [class*="css"] {
     font-size: 0.8rem !important;
 }
 
-/* Pemutar audio */
+/* Audio player */
 audio {
     width: 100%;
     height: 36px;
@@ -365,7 +358,7 @@ audio {
     accent-color: var(--accent-mid);
 }
 
-/* Tombol pilihan (radio buttons) */
+/* Radio buttons */
 [data-testid="stRadio"] > div {
     gap: 0.45rem !important;
     flex-direction: column !important;
@@ -401,7 +394,7 @@ audio {
     margin: 0;
 }
 
-/* Kotak deskripsi */
+/* Description box */
 .desc-box {
     font-size: 0.78rem;
     color: var(--text-muted);
@@ -413,7 +406,7 @@ audio {
     margin-top: 0.5rem;
 }
 
-/* Tombol deteksi */
+/* Detect button */
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, var(--accent) 0%, var(--accent-mid) 50%, #7779fa 100%) !important;
     color: #fff !important;
@@ -440,7 +433,7 @@ audio {
     box-shadow: 0 2px 12px rgba(91,94,244,0.35) !important;
 }
 
-/* Halaman kosong (empty state) */
+/* Empty state */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -510,7 +503,7 @@ audio {
     padding-top: 1px;
 }
 
-/* Kartu tampilan chord */
+/* Chord result card */
 .chord-display {
     background: linear-gradient(145deg, var(--surface) 0%, var(--surface-alt) 100%);
     border: 1px solid var(--border-light);
@@ -623,7 +616,7 @@ audio {
     text-align: right;
 }
 
-/* Daftar 5 prediksi teratas */
+/* Top-5 list */
 .section-label {
     font-size: 0.67rem;
     font-weight: 700;
@@ -704,7 +697,7 @@ audio {
 
 .pred-row.top .pred-pct { color: var(--accent-light); }
 
-/* Bagian peta fitur */
+/* Feature map section */
 .feat-header {
     font-size: 0.67rem;
     font-weight: 700;
@@ -714,7 +707,7 @@ audio {
     margin: 1.1rem 0 0.55rem;
 }
 
-/* Ekspander */
+/* Expander */
 [data-testid="stExpander"] {
     background: var(--surface) !important;
     border: 1px solid var(--border) !important;
@@ -735,7 +728,7 @@ audio {
     background: var(--surface-hi) !important;
 }
 
-/* Peringatan (alerts) */
+/* Alerts */
 [data-testid="stAlert"] {
     border-radius: var(--r-md) !important;
     border-left-width: 3px !important;
@@ -744,14 +737,14 @@ audio {
     background: var(--surface) !important;
 }
 
-/* Indikator putar (spinner) */
+/* Spinner */
 [data-testid="stSpinner"] p {
     color: var(--text-muted) !important;
     font-family: var(--sans) !important;
     font-size: 0.84rem !important;
 }
 
-/* Keterangan gambar (caption) */
+/* Caption */
 [data-testid="stCaptionContainer"] p {
     font-size: 0.71rem !important;
     color: var(--text-muted) !important;
@@ -796,13 +789,13 @@ audio {
     letter-spacing: 0.03em;
 }
 
-/* Bilah gulir (scrollbar) */
+/* Scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(91,94,244,0.45); }
 
-/* Responsif */
+/* Responsive */
 @media (max-width: 920px) {
     .page-header { padding: 2.5rem 1.5rem 2rem; }
     [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child {
@@ -836,7 +829,7 @@ audio {
 </style>
 """, unsafe_allow_html=True)
 
-# -- Header halaman ---------------------------------------------------------------
+# -- Page header ---------------------------------------------------------------
 st.markdown("""
 <div class="page-header">
     <h1 class="page-title">Chord<span class="grad">Net</span></h1>
@@ -847,10 +840,10 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# -- Tata letak dua kolom ---------------------------------------------------------
+# -- Two-column layout ---------------------------------------------------------
 col_left, col_right = st.columns([1, 1.9], gap="small")
 
-# -- KIRI: kontrol input ------------------------------------------------------
+# -- LEFT: input controls ------------------------------------------------------
 with col_left:
     st.markdown('<div class="field-label">Sumber Audio</div>', unsafe_allow_html=True)
     input_mode = st.radio(
@@ -917,10 +910,10 @@ with col_left:
         use_container_width=True,
     )
 
-# -- KANAN: hasil atau halaman kosong ---------------------------------------------
+# -- RIGHT: results or empty state ---------------------------------------------
 with col_right:
     if run_button:
-        # Tentukan sumber input aktif
+        # Resolve active input source
         if input_mode == "upload":
             active_audio = uploaded_audio
             file_suffix  = (

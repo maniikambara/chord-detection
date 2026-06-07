@@ -114,25 +114,30 @@ Aplikasi akan terbuka di browser web default pada `http://localhost:8501`.
 
 ### Format Input yang Didukung
 
-Aplikasi menerima dua jenis input:
+Aplikasi menerima tiga jenis input:
 
-1. **File audio**: File WAV atau MP3 yang mengandung satu chord piano. Aplikasi akan secara otomatis mengekstrak representasi fitur yang dipilih dari audio mentah.
+1. **File audio**: File WAV atau MP3 yang mengandung satu chord. Aplikasi akan secara otomatis mengekstrak representasi fitur yang dipilih dari audio mentah.
 
 2. **Rekaman mikrofon**: Rekam chord secara langsung dari browser menggunakan tombol rekam. Rekam hingga 10 detik; sistem hanya menggunakan 4 detik pertama sesuai kondisi pelatihan. Fitur ini memerlukan Streamlit >= 1.31.
+
+3. **Tensor fitur yang telah dihitung**: File NumPy .npy yang mengandung array fitur. Bentuk yang diterima adalah:
+   - (H, W): Array fitur 2D
+   - (H, W, 1): Fitur 2D dengan dimensi channel
+   - (1, H, W, 1): Dimensi batch dan channel
 
 ### Cara Menggunakan Aplikasi
 
 1. Pilih sumber audio: pilih **Unggah File** untuk mengunggah file WAV/MP3, atau **Rekam Langsung** untuk merekam chord dari mikrofon.
 2. Pilih tipe fitur (mel, mfcc, atau chroma) dari daftar metode analisis. Tipe fitur ini harus sesuai dengan model yang ingin digunakan.
-3. Unggah file audio atau tekan tombol rekam dan mainkan chord piano.
-4. Klik **Deteksi Chord** untuk mengklasifikasikan chord.
+3. Unggah file audio, unggah tensor .npy, atau tekan tombol rekam dan mainkan chord.
+4. Klik "Deteksi Chord" untuk mengklasifikasikan chord.
 
-Aplikasi menampilkan 5 prediksi chord teratas beserta persentase tingkat keyakinannya, serta menampilkan visualisasi peta fitur audio yang diekstrak.
+Aplikasi menampilkan 5 chord teratas yang diprediksi beserta skor kepercayaannya dan menampilkan visualisasi fitur yang diekstrak.
 
 ### Catatan Penting
 
-- Tipe fitur yang dipilih harus kompatibel dengan bobot model yang dimuat. Untuk file audio atau rekaman, aplikasi akan mengekstrak fitur yang sesuai secara otomatis.
-- Fitur perekaman mikrofon memerlukan Streamlit >= 1.31. Jika versi Streamlit yang terpasang lebih lama, gunakan mode unggah file.
+- Tipe fitur yang dipilih harus kompatibel dengan file yang diunggah. Untuk file audio atau rekaman, aplikasi akan mengekstrak fitur yang sesuai. Untuk file .npy, pastikan bentuk data sesuai dengan dimensi yang diharapkan untuk tipe fitur yang dipilih.
+- Fitur perekaman mikrofon memerlukan Streamlit >= 1.31. Jika versi lebih lama digunakan, pilih mode unggah file.
 - Dekoding MP3 memerlukan `ffmpeg` atau library `audioread` yang terinstal di sistem.
 - Semua audio secara otomatis di-resample ke 16 kHz dan diisi atau dipotong hingga durasi 4 detik sesuai kondisi pelatihan.
 

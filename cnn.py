@@ -10,9 +10,10 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
     confusion_matrix,
-    classification_report
+    classification_report,
 )
 import matplotlib.pyplot as plt
+
 
 class CNNModel(nn.Module):
 
@@ -20,28 +21,30 @@ class CNNModel(nn.Module):
         super(CNNModel, self).__init__()
 
         self.features = nn.Sequential(
-
-            # BLOK 1
+            # BLOCK 1
             nn.Conv2d(1, 32, kernel_size=3, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(),
-
-            # BLOK 2
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout(0.10),
+            # BLOCK 2
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
-
-            # BLOK 3
+            nn.Dropout(0.20),
+            # BLOCK 3
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(),
-
-            # BLOK 4
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout(0.25),
+            # BLOCK 4
             nn.Conv2d(128, 256, kernel_size=3, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(),
             nn.AdaptiveAvgPool2d((4, 4)),
+            nn.Dropout(0.30),
         )
 
         self.classifier = nn.Sequential(
@@ -52,7 +55,7 @@ class CNNModel(nn.Module):
             nn.Linear(512, 256),
             nn.ReLU(),
             nn.Dropout(0.30),
-            nn.Linear(256, num_classes)
+            nn.Linear(256, num_classes),
         )
 
     def forward(self, x):
@@ -61,14 +64,12 @@ class CNNModel(nn.Module):
         return x
 
 
-
-
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
 # 1. Data
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
 
 def prepare_tensors(*arrays, dtype=torch.float32):
-    """Mengonversi numpy array ke float tensor dan mengubah urutan dimensi ke (N, C, H, W)."""
+    """Convert numpy arrays to float tensors and permute to (N, C, H, W)."""
     return [
         torch.tensor(a, dtype=dtype).permute(0, 3, 1, 2)
         for a in arrays
@@ -76,16 +77,17 @@ def prepare_tensors(*arrays, dtype=torch.float32):
 
 
 def prepare_labels(*arrays):
-    """Mengonversi numpy array label ke long tensor."""
+    """Convert numpy label arrays to long tensors."""
     return [torch.tensor(a, dtype=torch.long) for a in arrays]
 
 
 def make_loaders(train_x, train_y, val_x, val_y, test_x, test_y,
                  batch_size=32):
-    """Membungkus pasangan tensor ke dalam DataLoaders."""
+    """Wrap tensor pairs in DataLoaders."""
     def _loader(x, y, shuffle):
-        return DataLoader(TensorDataset(x, y), batch_size=batch_size,
-                          shuffle=shuffle)
+        return DataLoader(
+            TensorDataset(x, y), batch_size=batch_size, shuffle=shuffle
+        )
 
     return (
         _loader(train_x, train_y, shuffle=True),
@@ -96,32 +98,42 @@ def make_loaders(train_x, train_y, val_x, val_y, test_x, test_y,
 
 def data_preparation(train_x, train_y, val_x, val_y, test_x, test_y,
                      batch_size=32):
-    """Alur lengkap penyiapan data; mengembalikan (loaders, num_classes, device)."""
+    """
+    Full data-prep pipeline.
+
+    Returns (loaders, device).
+
+    NOTE: num_classes is intentionally NOT derived here from the training
+    labels, because not every class is guaranteed to appear in the training
+    split.  Pass num_classes explicitly from run_pipeline using len(labels).
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Menggunakan perangkat: {device}")
+    print(f"Using device: {device}")
 
     xs = prepare_tensors(train_x, val_x, test_x)
     ys = prepare_labels(train_y, val_y, test_y)
 
-    print(f"Ukuran train_x: {xs[0].shape}")
-    assert xs[0].shape[1] == 1, f"Diharapkan 1 kanal (channel), mendapatkan {xs[0].shape[1]}"
+    print(f"train_x shape: {xs[0].shape}")
+    assert xs[0].shape[1] == 1, (
+        f"Expected 1 channel, got {xs[0].shape[1]}. "
+        "Ensure feature arrays have shape (N, H, W, 1)."
+    )
 
-    loaders = make_loaders(xs[0], ys[0], xs[1], ys[1], xs[2], ys[2], batch_size=batch_size)
-    num_classes = len(torch.unique(ys[0]))
-    print(f"Jumlah kelas: {num_classes}")
+    loaders = make_loaders(
+        xs[0], ys[0], xs[1], ys[1], xs[2], ys[2], batch_size=batch_size
+    )
+    return loaders, device
 
-    return loaders, num_classes, device
 
-
-# ─────────────────────────────────────────
-# 2. Pembantu Pelatihan (Training Helpers)
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
+# 2. Training helpers
+# ---------------------------------------------------------
 
 def run_epoch(model, loader, criterion, device, optimizer=None):
     """
-    Menjalankan satu epoch (pelatihan atau evaluasi).
-    Gunakan optimizer=None untuk mode evaluasi (tanpa pembaruan gradien).
-    Mengembalikan (avg_loss, accuracy).
+    Run one epoch (train or eval).
+    Pass optimizer=None for eval mode (no gradient update).
+    Returns (avg_loss, accuracy).
     """
     is_train = optimizer is not None
     model.train() if is_train else model.eval()
@@ -155,13 +167,13 @@ def run_epoch(model, loader, criterion, device, optimizer=None):
 def check_early_stopping(val_loss, best_val_loss, counter, patience,
                          model, save_path="best_model.pth"):
     """
-    Menyimpan model ketika ada peningkatan; meningkatkan penghitung (counter) jika tidak.
-    Mengembalikan (best_val_loss, counter, stop).
+    Save model on improvement; increment counter otherwise.
+    Returns (best_val_loss, counter, stop).
     """
     if val_loss < best_val_loss:
         best_val_loss = val_loss
         torch.save(model.state_dict(), save_path)
-        print("  ✓ Model terbaik disimpan")
+        print("  Best model saved")
         counter = 0
     else:
         counter += 1
@@ -170,13 +182,13 @@ def check_early_stopping(val_loss, best_val_loss, counter, patience,
     return best_val_loss, counter, stop
 
 
-# ─────────────────────────────────────────
-# 3. Loop Pelatihan (Training Loop)
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
+# 3. Training loop
+# ---------------------------------------------------------
 
 def train(model, train_loader, val_loader, criterion, optimizer, scheduler,
           device, epochs, patience, save_path="best_model.pth"):
-    """Loop pelatihan lengkap dengan penghentian awal (early stopping). Mengembalikan kamus riwayat (history dict)."""
+    """Full training loop with early stopping. Returns history dict."""
     history = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
     best_val_loss, counter = float("inf"), 0
 
@@ -196,32 +208,31 @@ def train(model, train_loader, val_loader, criterion, optimizer, scheduler,
         history["val_acc"].append(val_acc)
 
         print(f"\nEpoch [{epoch+1}/{epochs}]")
-        print(f"  Latih — Loss: {train_loss:.4f}  Akurasi: {train_acc:.4f}")
-        print(f"  Val   — Loss: {val_loss:.4f}  Akurasi: {val_acc:.4f}")
+        print(f"  Train | Loss: {train_loss:.4f}  Acc: {train_acc:.4f}")
+        print(f"  Val   | Loss: {val_loss:.4f}  Acc: {val_acc:.4f}")
 
         best_val_loss, counter, stop = check_early_stopping(
             val_loss, best_val_loss, counter, patience, model, save_path
         )
         if stop:
-            print("\nPenghentian awal (early stopping) terpicu!")
+            print("\nEarly stopping triggered!")
             break
 
     return history
 
 
-# ─────────────────────────────────────────
-# 4. Evaluasi (Evaluation)
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
+# 4. Evaluation
+# ---------------------------------------------------------
 
-def evaluate(model, test_loader, criterion, labels, device,
+def evaluate(model, test_loader, criterion, device,
              save_path="best_model.pth"):
-    """Memuat bobot terbaik, menjalankan set pengujian, dan menampilkan metrik. Mengembalikan (preds, targets)."""
-    model.load_state_dict(torch.load(save_path, weights_only=True))
+    """Load best weights, run test set, print metrics. Returns (preds, targets)."""
+    model.load_state_dict(torch.load(save_path, map_location=device))
     test_loss, test_acc = run_epoch(
         model, test_loader, criterion, device, optimizer=None
     )
 
-    # Mengumpulkan prediksi untuk metrik mendetail
     preds_all, targets_all = [], []
     model.eval()
     with torch.no_grad():
@@ -230,86 +241,86 @@ def evaluate(model, test_loader, criterion, labels, device,
             preds_all.extend(torch.argmax(outputs, dim=1).cpu().numpy())
             targets_all.extend(targets.numpy())
 
-    precision = precision_score(targets_all, preds_all, average="weighted", zero_division=0)
-    recall    = recall_score(targets_all, preds_all, average="weighted", zero_division=0)
-    f1        = f1_score(targets_all, preds_all, average="weighted", zero_division=0)
+    precision = precision_score(
+        targets_all, preds_all, average="weighted", zero_division=0
+    )
+    recall = recall_score(
+        targets_all, preds_all, average="weighted", zero_division=0
+    )
+    f1 = f1_score(targets_all, preds_all, average="weighted", zero_division=0)
 
     print("\n" + "=" * 40)
-    print(f"Akurasi Pengujian : {test_acc:.4f}")
-    print(f"Loss Pengujian     : {test_loss:.4f}")
-    print(f"Presisi           : {precision:.4f}")
-    print(f"Sensitivitas (Recall) : {recall:.4f}")
-    print(f"Skor F1            : {f1:.4f}")
+    print(f"Test Accuracy : {test_acc:.4f}")
+    print(f"Test Loss     : {test_loss:.4f}")
+    print(f"Precision     : {precision:.4f}")
+    print(f"Recall        : {recall:.4f}")
+    print(f"F1 Score      : {f1:.4f}")
     print("=" * 40)
-    print("\nLaporan Klasifikasi:")
-    print(classification_report(targets_all, preds_all, target_names=labels, zero_division=0))
+    print("\nClassification Report:")
+    print(classification_report(targets_all, preds_all, zero_division=0))
 
     return preds_all, targets_all
 
 
-# ─────────────────────────────────────────
-# 5. Visualisasi (Visualisation)
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
+# 5. Visualisation
+# ---------------------------------------------------------
 
 def plot_history(history, save_path="training_history.png"):
-    """Menggambar kurva loss dan akurasi secara berdampingan."""
+    """Plot loss and accuracy curves side-by-side."""
     epochs_ran = range(1, len(history["train_loss"]) + 1)
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
     for ax, metric, title, ylabel in zip(
         axes,
         [("train_loss", "val_loss"), ("train_acc", "val_acc")],
-        ["Loss per Epoch", "Akurasi per Epoch"],
-        ["Loss", "Akurasi"],
+        ["Loss per Epoch", "Accuracy per Epoch"],
+        ["Loss", "Accuracy"],
     ):
-        ax.plot(epochs_ran, history[metric[0]], label=f"Latih {ylabel}", color="royalblue")
-        ax.plot(epochs_ran, history[metric[1]], label=f"Val {ylabel}",   color="tomato")
+        ax.plot(epochs_ran, history[metric[0]], label=f"Train {ylabel}",
+                color="royalblue")
+        ax.plot(epochs_ran, history[metric[1]], label=f"Val {ylabel}",
+                color="tomato")
         ax.set_title(title)
         ax.set_xlabel("Epoch")
         ax.set_ylabel(ylabel)
         ax.legend()
         ax.grid(True)
 
-    plt.suptitle("Riwayat Pelatihan", fontsize=14, fontweight="bold")
+    plt.suptitle("Training History", fontsize=14, fontweight="bold")
     plt.tight_layout()
     folder = Path("images")
-    folder.mkdir(
-        parents=True,
-        exist_ok=True
-    )
-    plt.savefig(folder/save_path, dpi=150)
+    folder.mkdir(parents=True, exist_ok=True)
+    plt.savefig(folder / save_path, dpi=150)
     plt.show()
 
 
 def plot_confusion_matrix(targets, preds, labels,
                           save_path="confusion_matrix.png"):
+    """Plot and save a labelled confusion-matrix heatmap."""
     cm = confusion_matrix(targets, preds)
-    plt.figure(figsize=(30, 30))
-    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
-                xticklabels=labels, yticklabels=labels,
-                annot_kws={"size": 8})
-    plt.title("Matriks Kebingungan (Confusion Matrix)", fontsize=16, fontweight="bold")
-    plt.xlabel("Label Prediksi", fontsize=12)
-    plt.ylabel("Label Sebenarnya", fontsize=12)
-
-    ax = plt.gca()
-    plt.setp(ax.get_xticklabels(), rotation=90, ha="center", fontsize=10)
-    plt.setp(ax.get_yticklabels(), rotation=0, fontsize=10)
-
+    plt.figure(figsize=(18, 16))
+    sns.heatmap(
+        cm, annot=True, fmt="d", cmap="Blues",
+        xticklabels=labels, yticklabels=labels,
+    )
+    plt.title("Confusion Matrix", fontsize=14, fontweight="bold")
+    plt.xlabel("Predicted Label")
+    plt.ylabel("True Label")
     plt.tight_layout()
     folder = Path("images")
     folder.mkdir(parents=True, exist_ok=True)
-    plt.savefig(folder / save_path, dpi=150, bbox_inches="tight")
+    plt.savefig(folder / save_path, dpi=150)
     plt.show()
 
 
-# ─────────────────────────────────────────
-# 6. Orkestrator (Orchestrator)
-# ─────────────────────────────────────────
+# ---------------------------------------------------------
+# 6. Orchestrator
+# ---------------------------------------------------------
 
 def build_training_components(num_classes, device):
-    """Menginstansiasi model, kriteria loss, optimizer, dan scheduler."""
-    model     = CNNModel(num_classes).to(device)
+    """Instantiate model, criterion, optimizer, and scheduler."""
+    model = CNNModel(num_classes).to(device)
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
     optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
@@ -319,30 +330,50 @@ def build_training_components(num_classes, device):
     return model, criterion, optimizer, scheduler
 
 
-def run_pipeline(train_x, train_y, val_x, val_y, test_x, test_y,
-                 labels, epochs=50, patience=10, batch_size=32, scenario="mel"):
-    """Alur lengkap (end-to-end pipeline): penyiapan → pelatihan → evaluasi → visualisasi."""
+def run_pipeline(
+    train_x, train_y,
+    val_x,   val_y,
+    test_x,  test_y,
+    labels,
+    epochs=50,
+    patience=10,
+    batch_size=32,
+    scenario="mel",
+):
+    """End-to-end pipeline: prep -> train -> evaluate -> visualise."""
     torch.manual_seed(42)
-    # Penyiapan Data
-    (train_loader, val_loader, test_loader), num_classes, device = data_preparation(
+
+    # num_classes comes from the full label list, not from unique training values.
+    # This ensures the model always has 48 output neurons regardless of which
+    # classes happen to appear in the training split.
+    num_classes = len(labels)
+    print(f"Number of classes: {num_classes}")
+
+    # Data
+    (train_loader, val_loader, test_loader), device = data_preparation(
         train_x, train_y, val_x, val_y, test_x, test_y, batch_size
     )
 
-    # Komponen
+    # Components
     model, criterion, optimizer, scheduler = build_training_components(
         num_classes, device
     )
 
-    # Pelatihan
+    # Train
+    save_path = f"best_{scenario}_model.pth"
     history = train(
         model, train_loader, val_loader, criterion, optimizer, scheduler,
-        device, epochs=epochs, patience=patience, save_path=(f"best_{scenario}_model.pth")
+        device, epochs=epochs, patience=patience, save_path=save_path,
     )
 
-    # Evaluasi
-    preds, targets = evaluate(model, test_loader, criterion, labels, device, save_path=f"best_{scenario}_model.pth")
+    # Evaluate
+    preds, targets = evaluate(
+        model, test_loader, criterion, device, save_path=save_path
+    )
 
-    # Visualisasi
-    plot_history(history, save_path=(f"{scenario}_training_history.png"))
-    plot_confusion_matrix(targets, preds, labels, save_path=(f"{scenario}_confusion_matrix.png"))
-
+    # Visualise
+    plot_history(history, save_path=f"{scenario}_training_history.png")
+    plot_confusion_matrix(
+        targets, preds, labels,
+        save_path=f"{scenario}_confusion_matrix.png",
+    )
