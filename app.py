@@ -27,6 +27,8 @@ try:
 except ImportError:
     HAS_MPL = False
 
+HAS_AUDIO_INPUT = hasattr(st, "audio_input")
+
 from cnn import CNNModel
 from load import LABELS, CHORD_TYPE_NAMES
 
@@ -171,7 +173,7 @@ def render_feature_map(feature: np.ndarray, feature_key: str) -> None:
 
 # -- Page config ---------------------------------------------------------------
 st.set_page_config(
-    page_title="Chord Detection",
+    page_title="ChordNet",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -830,7 +832,7 @@ audio {
 # -- Page header ---------------------------------------------------------------
 st.markdown("""
 <div class="page-header">
-    <h1 class="page-title">Piano <span class="grad">Chord</span> Detector</h1>
+    <h1 class="page-title">Chord<span class="grad">Net</span></h1>
     <p class="page-subtitle">
         Identifikasi chord piano secara otomatis menggunakan convolutional neural network
         dan tiga representasi fitur audio tingkat lanjut.
@@ -843,18 +845,48 @@ col_left, col_right = st.columns([1, 1.9], gap="small")
 
 # -- LEFT: input controls ------------------------------------------------------
 with col_left:
-    st.markdown('<div class="field-label">File Audio</div>', unsafe_allow_html=True)
-    uploaded_audio = st.file_uploader(
-        "Unggah audio",
-        type=["wav", "mp3"],
+    st.markdown('<div class="field-label">Sumber Audio</div>', unsafe_allow_html=True)
+    input_mode = st.radio(
+        "Sumber audio",
+        ["upload", "record"],
+        format_func=lambda x: "Unggah File" if x == "upload" else "Rekam Langsung",
         label_visibility="collapsed",
-        help="Format WAV atau MP3 yang mengandung satu chord piano, idealnya 2\u20135 detik.",
+        key="input_mode",
     )
-    if uploaded_audio is not None:
-        st.audio(
-            uploaded_audio,
-            format="audio/wav" if uploaded_audio.name.lower().endswith(".wav") else "audio/mp3",
+
+    st.markdown('<div class="hdivider"></div>', unsafe_allow_html=True)
+
+    if input_mode == "upload":
+        st.markdown('<div class="field-label">File Audio</div>', unsafe_allow_html=True)
+        uploaded_audio = st.file_uploader(
+            "Unggah audio",
+            type=["wav", "mp3"],
+            label_visibility="collapsed",
+            help="Format WAV atau MP3 yang mengandung satu chord piano, idealnya 2\u20135 detik.",
         )
+        if uploaded_audio is not None:
+            st.audio(
+                uploaded_audio,
+                format="audio/wav" if uploaded_audio.name.lower().endswith(".wav") else "audio/mp3",
+            )
+        recorded_audio = None
+    else:
+        st.markdown('<div class="field-label">Rekaman Mikrofon</div>', unsafe_allow_html=True)
+        if HAS_AUDIO_INPUT:
+            recorded_audio = st.audio_input(
+                "Rekam chord",
+                label_visibility="collapsed",
+            )
+            if recorded_audio is not None:
+                st.audio(recorded_audio, format="audio/wav")
+            st.caption("Rekam hingga 10 detik. Sistem menggunakan 4 detik pertama untuk analisis.")
+        else:
+            st.warning(
+                "Fitur rekam memerlukan Streamlit \u2265 1.31. "
+                "Perbarui dengan `pip install -U streamlit`."
+            )
+            recorded_audio = None
+        uploaded_audio = None
 
     st.markdown('<div class="hdivider"></div>', unsafe_allow_html=True)
     st.markdown('<div class="field-label">Metode Analisis</div>', unsafe_allow_html=True)
@@ -881,8 +913,20 @@ with col_left:
 # -- RIGHT: results or empty state ---------------------------------------------
 with col_right:
     if run_button:
-        if uploaded_audio is None:
-            st.error("Silakan unggah file audio terlebih dahulu.")
+        # Resolve active input source
+        if input_mode == "upload":
+            active_audio = uploaded_audio
+            file_suffix  = (
+                ".mp3"
+                if (uploaded_audio is not None and uploaded_audio.name.lower().endswith(".mp3"))
+                else ".wav"
+            )
+        else:
+            active_audio = recorded_audio
+            file_suffix  = ".wav"
+
+        if active_audio is None:
+            st.error("Silakan unggah file audio atau rekam chord terlebih dahulu.")
             st.session_state.result = None
         elif librosa is None:
             st.error("librosa belum terpasang. Pemrosesan audio tidak tersedia.")
@@ -898,9 +942,8 @@ with col_right:
 
             with st.spinner("Menganalisis audio\u2026"):
                 try:
-                    file_bytes = uploaded_audio.read()
-                    suffix     = ".mp3" if uploaded_audio.name.lower().endswith(".mp3") else ".wav"
-                    raw_feat   = extract_feature_from_audio(file_bytes, feature_key, suffix=suffix)
+                    file_bytes = active_audio.read()
+                    raw_feat   = extract_feature_from_audio(file_bytes, feature_key, suffix=file_suffix)
                     feature    = raw_feat[..., np.newaxis]
                     probs      = predict(feature, model, device)
                     top_idx    = np.argsort(probs)[::-1][:5]
@@ -924,7 +967,7 @@ with col_right:
             <div class="step-list">
                 <div class="step-item">
                     <div class="step-num">1</div>
-                    <div class="step-text">Unggah file WAV atau MP3 yang berisi chord piano</div>
+                    <div class="step-text">Unggah file WAV/MP3 atau rekam chord langsung dari mikrofon</div>
                 </div>
                 <div class="step-item">
                     <div class="step-num">2</div>
