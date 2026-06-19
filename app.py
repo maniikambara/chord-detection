@@ -66,6 +66,54 @@ def normalize_audio(audio: np.ndarray) -> np.ndarray:
     return audio / peak if peak > 0 else audio
 
 
+def denoise_audio(audio: np.ndarray, sr: int) -> np.ndarray:
+    """Reduce background noise from microphone recordings for cleaner chord detection.
+
+    Pipeline:
+    1. Bandpass filter (80-7500 Hz) to isolate piano-relevant frequencies and
+       remove low-frequency rumble, electrical hum, and high-frequency hiss.
+    2. Spectral gating: estimate the noise floor from the quietest frames
+       and subtract it from the magnitude spectrum.
+    3. Trim leading and trailing silence.
+    """
+    try:
+        from scipy.signal import butter, sosfilt
+    except ImportError:
+        return audio
+
+    # --- Stage 1: Bandpass filter ---
+    nyquist = sr / 2
+    lo = 80.0 / nyquist
+    hi = min(7500.0 / nyquist, 0.99)
+    sos = butter(5, [lo, hi], btype="band", output="sos")
+    audio = sosfilt(sos, audio).astype(np.float32)
+
+    # --- Stage 2: Spectral gating ---
+    n_fft_sg = 2048
+    hop_sg = 512
+    stft = librosa.stft(audio, n_fft=n_fft_sg, hop_length=hop_sg)
+    magnitude = np.abs(stft)
+    phase = np.angle(stft)
+
+    # Noise profile: mean magnitude of the quietest 10 % of frames
+    frame_energy = np.sum(magnitude ** 2, axis=0)
+    n_noise = max(1, int(len(frame_energy) * 0.10))
+    noise_idx = np.argsort(frame_energy)[:n_noise]
+    noise_profile = np.mean(magnitude[:, noise_idx], axis=1, keepdims=True)
+
+    # Subtract with a safety floor to prevent musical-noise artifacts
+    magnitude_clean = np.maximum(magnitude - 1.5 * noise_profile, magnitude * 0.05)
+    stft_clean = magnitude_clean * np.exp(1j * phase)
+    audio = librosa.istft(stft_clean, hop_length=hop_sg, length=len(audio)).astype(np.float32)
+
+    # --- Stage 3: Trim silence ---
+    trimmed, _ = librosa.effects.trim(audio, top_db=25)
+    if len(trimmed) >= int(sr * 0.3):
+        audio = trimmed
+
+    return audio
+
+
 def pad_or_truncate(audio: np.ndarray, target_length: int) -> np.ndarray:
     if len(audio) >= target_length:
         return audio[:target_length]
@@ -78,7 +126,8 @@ def standardize(feature: np.ndarray) -> np.ndarray:
 
 
 def extract_feature_from_audio(
-    file_bytes: bytes, feature_type: str, suffix: str = ".wav"
+    file_bytes: bytes, feature_type: str, suffix: str = ".wav",
+    denoise: bool = False,
 ) -> np.ndarray:
     if librosa is None:
         raise RuntimeError("librosa belum terpasang. Jalankan `pip install librosa`.")
@@ -93,6 +142,9 @@ def extract_feature_from_audio(
         tmp_path.unlink(missing_ok=True)
 
     audio = normalize_audio(audio)
+    if denoise:
+        audio = denoise_audio(audio, SR)
+        audio = normalize_audio(audio)
     audio = pad_or_truncate(audio, SR * DURATION)
 
     if feature_type == "mel":
@@ -943,7 +995,10 @@ with col_right:
             with st.spinner("Menganalisis audio\u2026"):
                 try:
                     file_bytes = active_audio.read()
-                    raw_feat   = extract_feature_from_audio(file_bytes, feature_key, suffix=file_suffix)
+                    raw_feat   = extract_feature_from_audio(
+                        file_bytes, feature_key, suffix=file_suffix,
+                        denoise=(input_mode == "record"),
+                    )
                     feature    = raw_feat[..., np.newaxis]
                     probs      = predict(feature, model, device)
                     top_idx    = np.argsort(probs)[::-1][:5]
