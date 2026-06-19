@@ -8,6 +8,13 @@ LABELS = ['Af_a', 'Af_d', 'Af_j', 'Af_n', 'An_a', 'An_d', 'An_j', 'An_n', 'Bf_a'
  'Ef_j', 'Ef_n', 'En_a', 'En_d', 'En_j', 'En_n', 'Fn_a', 'Fn_d', 'Fn_j', 'Fn_n',
  'Gf_a', 'Gf_d', 'Gf_j', 'Gf_n', 'Gn_a', 'Gn_d', 'Gn_j', 'Gn_n']
 
+CHORD_TYPE_NAMES = {
+    "a": "Augmented",
+    "d": "Diminished",
+    "j": "Major",
+    "n": "Minor",
+}
+
 def load_feature(name: str, cache_dir: str, label_encoder = None):
     x_path = Path(cache_dir) / f"{name}_x.npy"
     y_path = Path(cache_dir) / f"{name}_y.npy"
